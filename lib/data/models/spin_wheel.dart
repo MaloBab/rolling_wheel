@@ -1,6 +1,5 @@
 // lib/data/models/spin_wheel.dart
 
-import 'package:flutter/material.dart';
 import 'wheel_option.dart';
 import 'dependency.dart';
 
@@ -12,7 +11,9 @@ final class SpinWheel {
 
   final String? result;
   final bool removeAfterSpin;
-  final Color? gradientBaseColor;
+
+  final int? gradientBaseColorValue;
+
   final int repeatCount;
   final String? repeatSourceWheelId;
   final String? displayCondition;
@@ -24,7 +25,7 @@ final class SpinWheel {
     this.dependencies = const [],
     this.result,
     this.removeAfterSpin = false,
-    this.gradientBaseColor,
+    this.gradientBaseColorValue,
     this.repeatCount = 1,
     this.repeatSourceWheelId,
     this.displayCondition,
@@ -37,7 +38,7 @@ final class SpinWheel {
     List<Dependency>? dependencies,
     String? result,
     bool? removeAfterSpin,
-    Color? gradientBaseColor,
+    int? gradientBaseColorValue,
     bool clearGradient = false,
     int? repeatCount,
     String? repeatSourceWheelId,
@@ -53,8 +54,9 @@ final class SpinWheel {
         dependencies: dependencies ?? this.dependencies,
         result: clearResult ? null : result ?? this.result,
         removeAfterSpin: removeAfterSpin ?? this.removeAfterSpin,
-        gradientBaseColor:
-            clearGradient ? null : gradientBaseColor ?? this.gradientBaseColor,
+        gradientBaseColorValue: clearGradient
+            ? null
+            : gradientBaseColorValue ?? this.gradientBaseColorValue,
         repeatCount: repeatCount ?? this.repeatCount,
         repeatSourceWheelId: clearRepeatSource
             ? null
@@ -70,7 +72,7 @@ final class SpinWheel {
         'options': options.map((o) => o.toJson()).toList(),
         'dependencies': dependencies.map((d) => d.toJson()).toList(),
         'removeAfterSpin': removeAfterSpin,
-        'gradientBaseColor': gradientBaseColor?.toARGB32(),
+        'gradientBaseColor': gradientBaseColorValue,
         'repeatCount': repeatCount,
         'repeatSourceWheelId': repeatSourceWheelId,
         'displayCondition': displayCondition,
@@ -86,9 +88,7 @@ final class SpinWheel {
             .map((e) => Dependency.fromJson(e as Map<String, dynamic>))
             .toList(),
         removeAfterSpin: json['removeAfterSpin'] as bool? ?? false,
-        gradientBaseColor: json['gradientBaseColor'] != null
-            ? Color(json['gradientBaseColor'] as int)
-            : null,
+        gradientBaseColorValue: json['gradientBaseColor'] as int?,
         repeatCount: (json['repeatCount'] as int?) ?? 1,
         repeatSourceWheelId: json['repeatSourceWheelId'] as String?,
         displayCondition: json['displayCondition'] as String?,

@@ -2,7 +2,7 @@
 
 import 'package:uuid/uuid.dart';
 import '../data/models/models.dart';
-import '../presentation/theme/app_theme.dart';
+import '../core/constants/app_constants.dart';
 
 const _uuid = Uuid();
 
@@ -55,7 +55,7 @@ abstract final class GroupFactory {
     return WheelGroup(
       id: _uuid.v4(),
       name: src.name,
-      color: src.color,
+      colorValue: src.colorValue,
       description: src.description,
       wheels: remapped,
     );
@@ -63,13 +63,25 @@ abstract final class GroupFactory {
 
   static List<WheelGroup> sampleData() {
     final raceOptElf = WheelOption(
-        id: _uuid.v4(), name: 'Elfe', color: kWheelColors[2], weight: 1);
+        id: _uuid.v4(),
+        name: 'Elfe',
+        colorValue: kWheelColors[2].toARGB32(),
+        weight: 1);
     final raceOptHuman = WheelOption(
-        id: _uuid.v4(), name: 'Humain', color: kWheelColors[0], weight: 2);
+        id: _uuid.v4(),
+        name: 'Humain',
+        colorValue: kWheelColors[0].toARGB32(),
+        weight: 2);
     final raceOptDwarf = WheelOption(
-        id: _uuid.v4(), name: 'Nain', color: kWheelColors[5], weight: 1);
+        id: _uuid.v4(),
+        name: 'Nain',
+        colorValue: kWheelColors[5].toARGB32(),
+        weight: 1);
     final raceOptOrc = WheelOption(
-        id: _uuid.v4(), name: 'Orc', color: kWheelColors[3], weight: 1);
+        id: _uuid.v4(),
+        name: 'Orc',
+        colorValue: kWheelColors[3].toARGB32(),
+        weight: 1);
 
     final raceWheel = SpinWheel(
       id: _uuid.v4(),
@@ -78,13 +90,25 @@ abstract final class GroupFactory {
     );
 
     final classOptMage = WheelOption(
-        id: _uuid.v4(), name: 'Mage', color: kWheelColors[0], weight: 1);
+        id: _uuid.v4(),
+        name: 'Mage',
+        colorValue: kWheelColors[0].toARGB32(),
+        weight: 1);
     final classOptWarrior = WheelOption(
-        id: _uuid.v4(), name: 'Guerrier', color: kWheelColors[3], weight: 1);
+        id: _uuid.v4(),
+        name: 'Guerrier',
+        colorValue: kWheelColors[3].toARGB32(),
+        weight: 1);
     final classOptRogue = WheelOption(
-        id: _uuid.v4(), name: 'Voleur', color: kWheelColors[1], weight: 1);
+        id: _uuid.v4(),
+        name: 'Voleur',
+        colorValue: kWheelColors[1].toARGB32(),
+        weight: 1);
     final classOptDruid = WheelOption(
-        id: _uuid.v4(), name: 'Druide', color: kWheelColors[2], weight: 1);
+        id: _uuid.v4(),
+        name: 'Druide',
+        colorValue: kWheelColors[2].toARGB32(),
+        weight: 1);
 
     final classWheel = SpinWheel(
       id: _uuid.v4(),
@@ -128,26 +152,29 @@ abstract final class GroupFactory {
       name: 'Origine',
       options: [
         WheelOption(
-            id: _uuid.v4(), name: 'Noble', color: kWheelColors[1], weight: 1),
+            id: _uuid.v4(),
+            name: 'Noble',
+            colorValue: kWheelColors[1].toARGB32(),
+            weight: 1),
         WheelOption(
             id: _uuid.v4(),
             name: 'Orphelin',
-            color: kWheelColors[5],
+            colorValue: kWheelColors[5].toARGB32(),
             weight: 2),
         WheelOption(
             id: _uuid.v4(),
             name: 'Érudit',
-            color: kWheelColors[6],
+            colorValue: kWheelColors[6].toARGB32(),
             weight: 1),
         WheelOption(
             id: _uuid.v4(),
             name: 'Soldat',
-            color: kWheelColors[3],
+            colorValue: kWheelColors[3].toARGB32(),
             weight: 2),
         WheelOption(
             id: _uuid.v4(),
             name: 'Marchand',
-            color: kWheelColors[4],
+            colorValue: kWheelColors[4].toARGB32(),
             weight: 1),
       ],
     );
@@ -156,7 +183,7 @@ abstract final class GroupFactory {
       WheelGroup(
         id: _uuid.v4(),
         name: 'Création de personnage',
-        color: kGroupColors[0],
+        colorValue: kGroupColors[0].toARGB32(),
         description: 'Génération aléatoire de personnage RPG',
         wheels: [raceWheel, classWheel, origineWheel],
       ),

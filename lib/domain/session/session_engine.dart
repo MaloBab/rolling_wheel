@@ -1,7 +1,6 @@
 // lib/domain/session/session_engine.dart
 
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
 import '../../core/utils/color_utils.dart';
 import '../../core/utils/condition_parser.dart';
 import '../../data/models/models.dart';
@@ -9,10 +8,7 @@ import 'session_step.dart';
 
 abstract final class SessionEngine {
 
-  static Map<String, double> effectiveWeights(
-    SpinWheel wheel,
-    List<SpinWheel> allWheels,
-  ) {
+  static Map<String, double> effectiveWeights(SpinWheel wheel, List<SpinWheel> allWheels) {
     final weights = {for (final o in wheel.options) o.id: o.weight};
 
     for (final dep in wheel.dependencies) {
@@ -21,11 +17,7 @@ abstract final class SessionEngine {
 
       final srcOption = src.options.firstWhere(
         (o) => o.name == src.result,
-        orElse: () => const WheelOption(
-          id: '',
-          name: '',
-          color: Color(0x00000000),
-        ),
+        orElse: () => const WheelOption(id: '', name: '', colorValue: 0x00000000),
       );
       if (srcOption.id.isEmpty) continue;
 
@@ -39,9 +31,12 @@ abstract final class SessionEngine {
     return weights;
   }
 
-  static Map<String, Color> gradientColors(SpinWheel wheel) {
-    if (wheel.gradientBaseColor == null) return {};
-    return ColorUtils.buildGradientMap(wheel.options, wheel.gradientBaseColor!);
+  static Map<String, int> gradientColorValues(SpinWheel wheel) {
+    if (wheel.gradientBaseColorValue == null) return {};
+    return ColorUtils.buildGradientMapFromInt(
+      wheel.options,
+      wheel.gradientBaseColorValue!,
+    );
   }
 
   static bool isSkipped(SpinWheel wheel, List<SpinWheel> allWheels) {
@@ -77,20 +72,12 @@ abstract final class SessionEngine {
     ];
   }
 
-  static List<SessionStep> rebuildSteps(
-    List<SpinWheel> allWheels,
-    List<SessionStep> previousSteps,
-  ) {
+  static List<SessionStep> rebuildSteps(List<SpinWheel> allWheels, List<SessionStep> previousSteps) {
     final rebuilt = <SessionStep>[];
 
     for (final wheel in allWheels) {
       if (isSkipped(wheel, allWheels)) {
-        rebuilt.add(SessionStep(
-          wheel: wheel,
-          spinNumber: 1,
-          totalSpins: 1,
-          skipped: true,
-        ));
+        rebuilt.add(SessionStep(wheel: wheel, spinNumber: 1, totalSpins: 1, skipped: true));
       } else {
         final count = effectiveRepeatCount(wheel, allWheels);
         for (var i = 0; i < count; i++) {
@@ -121,13 +108,8 @@ abstract final class SessionEngine {
     return rebuilt;
   }
 
-  static WheelOption? resolveWinner(
-    SpinWheel wheel,
-    Map<String, double> weights,
-    double angle,
-  ) {
-    final activeOpts =
-        wheel.options.where((o) => (weights[o.id] ?? 0) > 0).toList();
+  static WheelOption? resolveWinner(SpinWheel wheel, Map<String, double> weights, double angle) {
+    final activeOpts = wheel.options.where((o) => (weights[o.id] ?? 0) > 0).toList();
     if (activeOpts.isEmpty) return null;
 
     final total = activeOpts.fold(0.0, (s, o) => s + (weights[o.id] ?? 0));

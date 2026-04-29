@@ -1,13 +1,12 @@
 // lib/presentation/providers/groups_provider.dart
 
-import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
 import '../../data/models/models.dart';
 import '../../data/repositories/group_repository.dart';
 import '../../domain/group_factory.dart';
-import '../theme/app_theme.dart';
+import '../../domain/services/group_service.dart';
 
-const _uuid = Uuid();
 class GroupsProvider extends ChangeNotifier {
   final GroupRepository _repository;
 
@@ -16,10 +15,11 @@ class GroupsProvider extends ChangeNotifier {
 
   List<WheelGroup> _groups = [];
   bool _loaded = false;
+  String? _persistenceError;
 
   List<WheelGroup> get groups => List.unmodifiable(_groups);
   bool get isLoaded => _loaded;
-
+  String? get persistenceError => _persistenceError;
 
   Future<void> load() async {
     final loaded = await _repository.loadAll();
@@ -28,233 +28,126 @@ class GroupsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _persist() => _repository.saveAll(_groups);
-
-  WheelGroup addGroup({required String name, Color? color, String? description}) {
-    final c = color ?? kGroupColors[_groups.length % kGroupColors.length];
-    final g = WheelGroup(
-      id: _uuid.v4(),
+  Future<WheelGroup> addGroup({required String name, Color? color, String? description}) async {
+    final result = GroupService.addGroup(
+      _groups,
       name: name,
-      color: c,
+      colorValue: color?.toARGB32(),
       description: description,
     );
-    _groups = [..._groups, g];
-    _persist();
-    notifyListeners();
-    return g;
+    await _apply(result.updatedGroups);
+    return result.value;
   }
 
-  void updateGroup(String groupId, {String? name, Color? color, String? description}) {
-    _mutateGroup(
-        groupId,
-        (g) => g.copyWith(
-              name: name,
-              color: color,
-              description: description,
-            ));
+  Future<void> updateGroup(String groupId, {String? name, Color? color, String? description}) async {
+    await _apply(GroupService.updateGroup(
+      _groups,
+      groupId,
+      name: name,
+      colorValue: color?.toARGB32(),
+      description: description,
+    ));
   }
 
-  void deleteGroup(String groupId) {
-    _groups = _groups.where((g) => g.id != groupId).toList();
-    _persist();
-    notifyListeners();
+  Future<void> deleteGroup(String groupId) async {
+    await _apply(GroupService.deleteGroup(_groups, groupId));
   }
 
-  void importGroup(WheelGroup group, {bool forceNewId = true}) {
+  Future<void> importGroup(WheelGroup group, {bool forceNewId = true}) async {
     final toAdd = forceNewId ? GroupFactory.remapIds(group) : group;
-    _groups = [..._groups, toAdd];
-    _persist();
-    notifyListeners();
+    await _apply([..._groups, toAdd]);
   }
 
-  void reorderGroups(int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex--;
-    final list = [..._groups];
-    list.insert(newIndex, list.removeAt(oldIndex));
-    _groups = list;
-    _persist();
-    notifyListeners();
+  Future<void> reorderGroups(int oldIndex, int newIndex) async {
+    await _apply(GroupService.reorderGroups(_groups, oldIndex, newIndex));
   }
 
-  SpinWheel addWheel(String groupId, {required String name, List<String>? optionNames}) {
-    final options = (optionNames ?? [])
-        .asMap()
-        .entries
-        .map((e) => WheelOption(
-              id: _uuid.v4(),
-              name: e.value,
-              color: kWheelColors[e.key % kWheelColors.length],
-            ))
-        .toList();
-    final wheel = SpinWheel(id: _uuid.v4(), name: name, options: options);
-    _mutateGroup(groupId, (g) => g.copyWith(wheels: [...g.wheels, wheel]));
-    return wheel;
-  }
 
-  void updateWheel(String groupId, String wheelId, {String? name, bool? removeAfterSpin}) {
-    _mutateWheel(groupId, wheelId,
-        (w) => w.copyWith(name: name, removeAfterSpin: removeAfterSpin));
-  }
-
-  void updateWheelGradient(String groupId, String wheelId, Color? baseColor) {
-    _mutateWheel(
-        groupId,
-        wheelId,
-        (w) => baseColor == null
-            ? w.copyWith(clearGradient: true)
-            : w.copyWith(gradientBaseColor: baseColor));
-  }
-
-  void updateWheelRepeat(String groupId, String wheelId, {int? repeatCount, String? repeatSourceWheelId, bool clearSource = false}) {
-    _mutateWheel(
+  Future<SpinWheel> addWheel(String groupId, {required String name, List<String>? optionNames}) async {
+    final result = GroupService.addWheel(
+      _groups,
       groupId,
-      wheelId,
-      (w) => w.copyWith(
-        repeatCount: repeatCount,
-        repeatSourceWheelId: repeatSourceWheelId,
-        clearRepeatSource: clearSource,
-      ),
+      name: name,
+      optionNames: optionNames,
     );
+    await _apply(result.updatedGroups);
+    return result.value;
   }
 
-  void updateWheelCondition(String groupId, String wheelId, String? condition) {
-    final trimmed =
-        (condition == null || condition.trim().isEmpty) ? null : condition.trim();
-    _mutateWheel(
-        groupId,
-        wheelId,
-        (w) => trimmed == null
-            ? w.copyWith(clearCondition: true)
-            : w.copyWith(displayCondition: trimmed));
+  Future<void> updateWheel(String groupId, String wheelId, {String? name, bool? removeAfterSpin}) async {
+    await _apply(GroupService.updateWheel(_groups, groupId, wheelId, name: name, removeAfterSpin: removeAfterSpin));
   }
 
-  void deleteWheel(String groupId, String wheelId) {
-    _mutateGroup(
-      groupId,
-      (g) => g.copyWith(
-        wheels: g.wheels.where((w) => w.id != wheelId).toList(),
-      ),
-    );
+  Future<void> updateWheelGradient(String groupId, String wheelId, Color? baseColor) async {
+    await _apply(GroupService.updateWheelGradient(_groups, groupId, wheelId, baseColor?.toARGB32()));
   }
 
-  void reorderWheels(String groupId, int oldIndex, int newIndex) {
-    if (newIndex > oldIndex) newIndex--;
-    _mutateGroup(groupId, (g) {
-      final list = [...g.wheels];
-      list.insert(newIndex, list.removeAt(oldIndex));
-      return g.copyWith(wheels: list);
-    });
+  Future<void> updateWheelRepeat(String groupId, String wheelId, {int? repeatCount, String? repeatSourceWheelId, bool clearSource = false}) async {
+    await _apply(GroupService.updateWheelRepeat(
+      _groups, groupId, wheelId, repeatCount: repeatCount, repeatSourceWheelId: repeatSourceWheelId, clearSource: clearSource));
   }
 
-  WheelOption addOption(String groupId, String wheelId, {required String name}) {
-    final wheel = _findWheel(groupId, wheelId)!;
-    final usedColors = wheel.options.map((o) => o.color).toSet();
-    final color = kWheelColors.firstWhere(
-      (c) => !usedColors.contains(c),
-      orElse: () => kWheelColors[wheel.options.length % kWheelColors.length],
-    );
-    final opt = WheelOption(id: _uuid.v4(), name: name, color: color);
-    _mutateWheel(
-        groupId, wheelId, (w) => w.copyWith(options: [...w.options, opt]));
-    return opt;
+  Future<void> updateWheelCondition(String groupId, String wheelId, String? condition) async {
+    await _apply(GroupService.updateWheelCondition(_groups, groupId, wheelId, condition));
   }
 
-  void updateOption(String groupId, String wheelId, String optionId, {String? name, Color? color, double? weight}) {
-    _mutateWheel(groupId, wheelId, (w) {
-      final options = w.options.map((o) {
-        if (o.id != optionId) return o;
-        return o.copyWith(name: name, color: color, weight: weight);
-      }).toList();
-      return w.copyWith(options: options);
-    });
+  Future<void> deleteWheel(String groupId, String wheelId) async {
+    await _apply(GroupService.deleteWheel(_groups, groupId, wheelId));
   }
 
-  void deleteOption(String groupId, String wheelId, String optionId) {
-    _mutateWheel(
-        groupId,
-        wheelId,
-        (w) => w.copyWith(
-              options: w.options.where((o) => o.id != optionId).toList(),
-            ));
+  Future<void> reorderWheels(String groupId, int oldIndex, int newIndex) async {
+    await _apply(
+        GroupService.reorderWheels(_groups, groupId, oldIndex, newIndex));
   }
 
-  void addDependency(String groupId, String wheelId, Dependency dep) {
-    _mutateWheel(groupId, wheelId,
-        (w) => w.copyWith(dependencies: [...w.dependencies, dep]));
+  Future<WheelOption> addOption(String groupId, String wheelId, {required String name}) async {
+    final result = GroupService.addOption(_groups, groupId, wheelId, name: name);
+    await _apply(result.updatedGroups);
+    return result.value;
   }
 
-  void updateDependency(String groupId, String wheelId, int index, Dependency dep) {
-    _mutateWheel(groupId, wheelId, (w) {
-      final deps = [...w.dependencies];
-      if (index >= deps.length) return w;
-      deps[index] = dep;
-      return w.copyWith(dependencies: deps);
-    });
+  Future<void> updateOption(String groupId, String wheelId, String optionId, {String? name, Color? color, double? weight}) async {
+    await _apply(GroupService.updateOption(_groups, groupId, wheelId, optionId, name: name, colorValue: color?.toARGB32(), weight: weight));
   }
 
-  void removeDependency(String groupId, String wheelId, int index) {
-    _mutateWheel(groupId, wheelId, (w) {
-      final deps = [...w.dependencies]..removeAt(index);
-      return w.copyWith(dependencies: deps);
-    });
+  Future<void> deleteOption(String groupId, String wheelId, String optionId) async {
+    await _apply(GroupService.deleteOption(_groups, groupId, wheelId, optionId));
   }
 
-  void setWheelResult(String groupId, String wheelId, String? result) {
-    _mutateWheel(groupId, wheelId, (w) {
-      final updated = w.copyWith(
-        result: result,
-        clearResult: result == null,
-      );
-      if (result != null && w.removeAfterSpin) {
-        return updated.copyWith(
-          options: updated.options.where((o) => o.name != result).toList(),
-        );
-      }
-      return updated;
-    });
+  Future<void> addDependency(String groupId, String wheelId, Dependency dep) async {
+    await _apply(GroupService.addDependency(_groups, groupId, wheelId, dep));
   }
 
-  void resetGroupResults(String groupId) {
-    _mutateGroup(groupId, (g) {
-      return g.copyWith(
-        wheels: g.wheels.map((w) => w.copyWith(clearResult: true)).toList(),
-      );
-    });
+  Future<void> updateDependency(String groupId, String wheelId, int index, Dependency dep) async {
+    await _apply(GroupService.updateDependency(_groups, groupId, wheelId, index, dep));
   }
 
-  WheelGroup? _findGroup(String id) {
-    try {
-      return _groups.firstWhere((g) => g.id == id);
-    } catch (_) {
-      return null;
-    }
+  Future<void> removeDependency(String groupId, String wheelId, int index) async {
+    await _apply(GroupService.removeDependency(_groups, groupId, wheelId, index));
   }
 
-  SpinWheel? _findWheel(String groupId, String wheelId) {
-    try {
-      return _findGroup(groupId)?.wheels.firstWhere((w) => w.id == wheelId);
-    } catch (_) {
-      return null;
-    }
+  Future<void> setWheelResult(String groupId, String wheelId, String? result) async {
+    await _apply(GroupService.setWheelResult(_groups, groupId, wheelId, result));
   }
 
-  void _mutateGroup(String groupId, WheelGroup Function(WheelGroup) transform) {
-    _groups = _groups.map((g) {
-      if (g.id != groupId) return g;
-      return transform(g);
-    }).toList();
-    _persist();
+  Future<void> resetGroupResults(String groupId) async {
+    await _apply(GroupService.resetGroupResults(_groups, groupId));
+  }
+
+  Future<void> _apply(List<WheelGroup> updated) async {
+    _groups = updated;
+    _persistenceError = null;
     notifyListeners();
+    await _persist();
   }
 
-  void _mutateWheel(String groupId, String wheelId, SpinWheel Function(SpinWheel) transform) {
-    _mutateGroup(groupId, (g) {
-      return g.copyWith(
-        wheels: g.wheels.map((w) {
-          if (w.id != wheelId) return w;
-          return transform(w);
-        }).toList(),
-      );
-    });
+  Future<void> _persist() async {
+    try {
+      await _repository.saveAll(_groups);
+    } catch (e, stack) {
+      _persistenceError = 'Sauvegarde échouée : $e';
+      notifyListeners();
+      debugPrintStack(stackTrace: stack, label: 'GroupsProvider._persist');
+    }
   }
 }
