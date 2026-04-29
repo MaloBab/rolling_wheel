@@ -1,157 +1,90 @@
-// lib/screens/session_screen.dart
+// lib/presentation/screens/session/session_screen.dart
+//
+// Widget purement déclaratif. Tout l'état et la logique de session
+// sont dans [SessionProvider], instancié en scope local ici.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
-import '../providers/groups_provider.dart';
-import '../utils/app_theme.dart';
+import '../../../data/models/models.dart';
+import '../../../domain/session/session_step.dart';
+import '../../providers/groups_provider.dart';
+import '../../providers/session_provider.dart';
+import '../../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/wheel_painter.dart';
 
 // ──────────────────────────────────────────────
-// Modèle interne : un "step" de session
-// Peut représenter un tour normal ou un tour répété.
+// Point d'entrée : instancie le SessionProvider en scope local
 // ──────────────────────────────────────────────
 
-class _SessionStep {
-  final SpinWheel wheel;
-  final int spinNumber;   // 1-based, pour les roues répétées (ex: "Tour 2/3")
-  final int totalSpins;   // nombre total de tours pour cette roue
-  String? result;
-  bool skipped;
-
-  _SessionStep({
-    required this.wheel,
-    this.spinNumber = 1,
-    this.totalSpins = 1,
-    this.skipped = false,
-  });
-
-  bool get isRepeatedWheel => totalSpins > 1;
-}
-
-// ──────────────────────────────────────────────
-// SessionScreen
-// ──────────────────────────────────────────────
-
-class SessionScreen extends StatefulWidget {
+class SessionScreen extends StatelessWidget {
   final String groupId;
 
   const SessionScreen({super.key, required this.groupId});
 
   @override
-  State<SessionScreen> createState() => _SessionScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (ctx) => SessionProvider(
+        groupsProvider: ctx.read<GroupsProvider>(),
+        groupId: groupId,
+      ),
+      child: _SessionView(groupId: groupId),
+    );
+  }
 }
 
-class _SessionScreenState extends State<SessionScreen> {
-  int _currentStepIndex = 0;
-  bool _finished = false;
-  bool _stepsBuilt = false;
-  List<_SessionStep> _steps = [];
+// ──────────────────────────────────────────────
+// Vue principale
+// ──────────────────────────────────────────────
+
+class _SessionView extends StatefulWidget {
+  final String groupId;
+
+  const _SessionView({required this.groupId});
+
+  @override
+  State<_SessionView> createState() => _SessionViewState();
+}
+
+class _SessionViewState extends State<_SessionView> {
   final _wheelKey = GlobalKey<SpinWheelWidgetState>(debugLabel: 'spinWheel');
 
   @override
   void initState() {
     super.initState();
+    // Initialisation après le premier frame pour que le provider soit prêt.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<GroupsProvider>();
-      provider.resetGroupResults(widget.groupId);
-      _buildSteps(provider);
-    });
-  }
-
-  /// Construit la liste des steps initiaux (sans tenir compte des conditions
-  /// ni des répétitions dynamiques – celles-ci sont réévaluées à chaque avance).
-  void _buildSteps(GroupsProvider provider) {
-    final group = provider.groups.firstWhere((g) => g.id == widget.groupId);
-    final steps = <_SessionStep>[];
-    for (final wheel in group.wheels) {
-      steps.add(_SessionStep(wheel: wheel, spinNumber: 1, totalSpins: 1));
-    }
-    setState(() {
-      _steps = steps;
-      _stepsBuilt = true;
-    });
-  }
-
-  /// Après chaque résultat, on réexpanse les steps pour les roues avec repeatCount > 1.
-  /// On recalcule aussi les steps skipped.
-  void _expandStepsAfterResult(GroupsProvider provider, WheelGroup group) {
-    final allWheels = group.wheels;
-    final rebuilt = <_SessionStep>[];
-
-    for (final wheel in allWheels) {
-      final effectiveCount = wheel.effectiveRepeatCount(allWheels);
-      final isSkipped = wheel.isSkippedConditionally(allWheels);
-
-      if (isSkipped) {
-        rebuilt.add(_SessionStep(
-          wheel: wheel,
-          spinNumber: 1,
-          totalSpins: 1,
-          skipped: true,
-        ));
-      } else {
-        for (int i = 0; i < effectiveCount; i++) {
-          rebuilt.add(_SessionStep(
-            wheel: wheel,
-            spinNumber: i + 1,
-            totalSpins: effectiveCount,
-          ));
-        }
-      }
-    }
-
-    // Conserver les résultats déjà obtenus pour les steps précédents
-    int oldIdx = 0;
-    for (int i = 0; i < rebuilt.length && oldIdx < _steps.length; i++) {
-      while (oldIdx < _steps.length &&
-          _steps[oldIdx].wheel.id != rebuilt[i].wheel.id) {
-        oldIdx++;
-      }
-      if (oldIdx < _steps.length) {
-        rebuilt[i].result = _steps[oldIdx].result;
-        rebuilt[i].skipped = _steps[oldIdx].skipped;
-        oldIdx++;
-      }
-    }
-
-    // Recalculer _currentStepIndex : premier step sans résultat et non skippé
-    int newCurrent = _currentStepIndex;
-    if (newCurrent >= rebuilt.length) newCurrent = rebuilt.length - 1;
-
-    setState(() {
-      _steps = rebuilt;
-      _currentStepIndex = newCurrent;
+      context.read<SessionProvider>().initialize();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<GroupsProvider>(
-      builder: (context, provider, _) {
-        final group = provider.groups.firstWhere((g) => g.id == widget.groupId);
+    return Consumer<SessionProvider>(
+      builder: (context, session, _) {
+        final groupsProvider = context.read<GroupsProvider>();
+        final group = groupsProvider.groups
+            .firstWhere((g) => g.id == widget.groupId);
 
-        if (!_stepsBuilt) {
+        if (!session.initialized) {
           return Scaffold(
             backgroundColor: kBg,
-            body: const Center(child: CircularProgressIndicator(color: kAccent)),
+            body: const Center(
+                child: CircularProgressIndicator(color: kAccent)),
           );
         }
-
-        if (group.wheels.isEmpty) {
-          return _buildEmpty(context);
-        }
-        if (_finished) {
-          return _buildSummary(context, group);
-        }
-        return _buildSession(context, provider, group);
+        if (group.wheels.isEmpty) return _buildEmpty(context);
+        if (session.finished) return _buildSummary(context, session, group);
+        return _buildSession(context, session, group);
       },
     );
   }
+
+  // ── Écrans ────────────────────────────────────────────────────────────────
 
   Widget _buildEmpty(BuildContext context) {
     return Scaffold(
@@ -161,17 +94,19 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  Widget _buildSession(BuildContext context, GroupsProvider provider, WheelGroup group) {
-    if (_currentStepIndex >= _steps.length) {
-      return _buildSummary(context, group);
-    }
+  Widget _buildSession(
+    BuildContext context,
+    SessionProvider session,
+    WheelGroup group,
+  ) {
+    final step = session.currentStep;
+    if (step == null) return _buildSummary(context, session, group);
 
-    final step = _steps[_currentStepIndex];
-    final totalSteps = _steps.length;
-
-    // Si le step courant est skippé, on avance automatiquement
+    // Auto-avance sur les steps skippés.
     if (step.skipped) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _advanceStep(provider, group));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => session.advanceStep(),
+      );
       return Scaffold(
         backgroundColor: kBg,
         appBar: _buildAppBar(group.name),
@@ -179,14 +114,17 @@ class _SessionScreenState extends State<SessionScreen> {
       );
     }
 
+    final totalSteps = session.steps.length;
+    final currentIndex = session.currentStepIndex;
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: _buildAppBar(group.name),
       body: SafeArea(
         child: Column(
           children: [
-            _buildProgressBar(_currentStepIndex, totalSteps),
-            _buildWheelInfo(step, _currentStepIndex, totalSteps, group.wheels),
+            _buildProgressBar(currentIndex, totalSteps),
+            _buildWheelInfo(step, currentIndex, totalSteps),
             Expanded(
               child: Center(
                 child: SpinWheelWidget(
@@ -194,13 +132,13 @@ class _SessionScreenState extends State<SessionScreen> {
                   wheel: step.wheel,
                   allWheels: group.wheels,
                   size: _wheelSize(context),
-                  onResult: (winner) => _onResult(context, provider, group, step, winner),
+                  onSpinEnd: session.onSpinEnd,
                 ),
               ),
             ),
             _buildResultBanner(step),
-            _buildSkippedWheels(group),
-            _buildActions(context, provider, group, step),
+            _buildSkippedWheels(session),
+            _buildActions(context, session, step),
             const Gap(24),
           ],
         ),
@@ -208,52 +146,9 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  double _wheelSize(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    // Utilise 92% de la largeur, plafonné à 420px pour les grandes tablettes
-    return (size.width * 0.92).clamp(240.0, 420.0);
-  }
+  // ── Widgets de session ────────────────────────────────────────────────────
 
-  AppBar _buildAppBar(String title) {
-    return AppBar(
-      backgroundColor: kSurface,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.close, color: kText2, size: 20),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: Text(title,
-          style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: kBorder),
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(int current, int total) {
-    final progress = total == 0 ? 0.0 : current / total;
-    return Container(
-      height: 3,
-      color: kSurface2,
-      child: FractionallySizedBox(
-        widthFactor: progress,
-        alignment: Alignment.centerLeft,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [kAccent, kAccent3]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWheelInfo(
-    _SessionStep step,
-    int stepIndex,
-    int totalSteps,
-    List<SpinWheel> allWheels,
-  ) {
+  Widget _buildWheelInfo(SessionStep step, int stepIndex, int totalSteps) {
     final wheel = step.wheel;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -273,10 +168,10 @@ class _SessionScreenState extends State<SessionScreen> {
                         color: kText,
                       ),
                     ),
-                    // Badge répétition
-                    if (step.isRepeatedWheel) ...[
+                    if (step.isRepeated) ...[
                       const Gap(8),
-                      _RepeatBadge(current: step.spinNumber, total: step.totalSpins),
+                      _RepeatBadge(
+                          current: step.spinNumber, total: step.totalSpins),
                     ],
                   ],
                 ),
@@ -294,22 +189,21 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  /// Affiche un résumé compact des roues ignorées conditionnellement.
-  Widget _buildSkippedWheels(WheelGroup group) {
-    final skippedSteps = _steps
-        .where((s) => s.skipped && s.result == null)
-        .toList();
-    if (skippedSteps.isEmpty) return const SizedBox.shrink();
+  Widget _buildSkippedWheels(SessionProvider session) {
+    final skipped =
+        session.steps.where((s) => s.skipped && s.result == null).toList();
+    if (skipped.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
       child: Column(
-        children: skippedSteps.map((s) => _SkippedWheelTile(wheel: s.wheel)).toList(),
+        children:
+            skipped.map((s) => _SkippedWheelTile(wheel: s.wheel)).toList(),
       ),
     );
   }
 
-  Widget _buildResultBanner(_SessionStep step) {
+  Widget _buildResultBanner(SessionStep step) {
     final result = step.result;
     if (result == null) return const SizedBox.shrink();
     return Container(
@@ -329,7 +223,8 @@ class _SessionScreenState extends State<SessionScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Résultat', style: GoogleFonts.dmSans(fontSize: 11, color: kText3)),
+              Text('Résultat',
+                  style: GoogleFonts.dmSans(fontSize: 11, color: kText3)),
               Text(
                 result,
                 style: GoogleFonts.syne(
@@ -345,17 +240,18 @@ class _SessionScreenState extends State<SessionScreen> {
     )
         .animate()
         .fade(duration: 400.ms)
-        .slideY(begin: 0.3, end: 0, duration: 400.ms, curve: Curves.easeOutBack);
+        .slideY(
+            begin: 0.3, end: 0, duration: 400.ms, curve: Curves.easeOutBack);
   }
 
   Widget _buildActions(
     BuildContext context,
-    GroupsProvider provider,
-    WheelGroup group,
-    _SessionStep step,
+    SessionProvider session,
+    SessionStep step,
   ) {
     final hasResult = step.result != null;
-    final isLastStep = _currentStepIndex >= _steps.length - 1;
+    final isLastStep =
+        session.currentStepIndex >= session.steps.length - 1;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -366,21 +262,21 @@ class _SessionScreenState extends State<SessionScreen> {
               label: 'Tourner la roue !',
               icon: Icons.autorenew,
               fullWidth: true,
-              onPressed: () => _getWheelKey(step)?.currentState?.spin(),
+              onPressed: () => _wheelKey.currentState?.spin(),
             )
           else if (!isLastStep)
             SgButton(
               label: 'Étape suivante →',
               icon: Icons.arrow_forward,
               fullWidth: true,
-              onPressed: () => _advanceStep(provider, group),
+              onPressed: session.advanceStep,
             )
           else
             SgButton(
               label: 'Voir le récapitulatif',
               icon: Icons.summarize_outlined,
               fullWidth: true,
-              onPressed: () => setState(() => _finished = true),
+              onPressed: session.advanceStep,
             ),
           if (hasResult) ...[
             const Gap(10),
@@ -389,10 +285,7 @@ class _SessionScreenState extends State<SessionScreen> {
               variant: SgButtonVariant.secondary,
               icon: Icons.refresh,
               fullWidth: true,
-              onPressed: () {
-                setState(() => step.result = null);
-                provider.setWheelResult(group.id, step.wheel.id, null);
-              },
+              onPressed: session.retryCurrentStep,
             ),
           ],
         ],
@@ -400,59 +293,15 @@ class _SessionScreenState extends State<SessionScreen> {
     );
   }
 
-  GlobalKey<SpinWheelWidgetState>? _getWheelKey(_SessionStep step) => _wheelKey;
+  // ── Récapitulatif ─────────────────────────────────────────────────────────
 
-  void _onResult(
+  Widget _buildSummary(
     BuildContext context,
-    GroupsProvider provider,
+    SessionProvider session,
     WheelGroup group,
-    _SessionStep step,
-    WheelOption winner,
   ) {
-    setState(() => step.result = winner.name);
-    // On ne met le résultat dans le provider que pour le dernier spin de la roue
-    // (pour que les dépendances soient correctes).
-    if (step.spinNumber == step.totalSpins) {
-      provider.setWheelResult(group.id, step.wheel.id, winner.name);
-    }
-    // Réévaluer les steps (conditions, répétitions dynamiques)
-    _expandStepsAfterResult(provider, group);
-  }
-
-  void _advanceStep(GroupsProvider provider, WheelGroup group) {
-    if (_currentStepIndex < _steps.length - 1) {
-      setState(() => _currentStepIndex++);
-      // Passer automatiquement les steps skippés
-      _skipConditionalSteps(provider, group);
-    } else {
-      setState(() => _finished = true);
-    }
-  }
-
-  void _skipConditionalSteps(GroupsProvider provider, WheelGroup group) {
-    while (_currentStepIndex < _steps.length) {
-      final step = _steps[_currentStepIndex];
-      if (step.skipped) {
-        if (_currentStepIndex < _steps.length - 1) {
-          setState(() => _currentStepIndex++);
-        } else {
-          setState(() => _finished = true);
-          return;
-        }
-      } else {
-        break;
-      }
-    }
-  }
-
-  // ──────────────────────────────────────────────
-  // Summary screen
-  // ──────────────────────────────────────────────
-
-  Widget _buildSummary(BuildContext context, WheelGroup group) {
-    // Regrouper les résultats : si une roue a été tirée plusieurs fois, on liste tous les résultats
     final resultsByWheel = <String, List<String>>{};
-    for (final step in _steps) {
+    for (final step in session.steps) {
       if (step.result != null) {
         resultsByWheel.putIfAbsent(step.wheel.id, () => []).add(step.result!);
       }
@@ -468,7 +317,8 @@ class _SessionScreenState extends State<SessionScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text('Récapitulatif',
-            style: GoogleFonts.syne(fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
+            style: GoogleFonts.syne(
+                fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: kBorder),
@@ -490,7 +340,8 @@ class _SessionScreenState extends State<SessionScreen> {
                     const Gap(12),
                     GradientText(
                       group.name,
-                      style: GoogleFonts.syne(fontSize: 22, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.syne(
+                          fontSize: 22, fontWeight: FontWeight.w800),
                     ),
                     const Gap(4),
                     Text(
@@ -506,31 +357,28 @@ class _SessionScreenState extends State<SessionScreen> {
                 final i = entry.key;
                 final wheel = entry.value;
                 final results = resultsByWheel[wheel.id] ?? [];
-                final skipped = _steps.any((s) => s.wheel.id == wheel.id && s.skipped);
-
+                final skipped = session.steps
+                    .any((s) => s.wheel.id == wheel.id && s.skipped);
                 return _SummaryCard(
                   wheel: wheel,
                   index: i,
                   results: results,
                   skipped: skipped,
-                ).animate().fade(duration: 300.ms, delay: (i * 80).ms).slideY(
-                    begin: 0.2, end: 0, duration: 300.ms, delay: (i * 80).ms);
+                )
+                    .animate()
+                    .fade(duration: 300.ms, delay: (i * 80).ms)
+                    .slideY(
+                        begin: 0.2,
+                        end: 0,
+                        duration: 300.ms,
+                        delay: (i * 80).ms);
               }),
               const Gap(32),
               SgButton(
                 label: 'Nouvelle session',
                 icon: Icons.refresh,
                 fullWidth: true,
-                onPressed: () {
-                  final provider = context.read<GroupsProvider>();
-                  provider.resetGroupResults(widget.groupId);
-                  setState(() {
-                    _currentStepIndex = 0;
-                    _finished = false;
-                    _stepsBuilt = false;
-                  });
-                  _buildSteps(provider);
-                },
+                onPressed: session.restart,
               ),
               const Gap(12),
               SgButton(
@@ -541,6 +389,48 @@ class _SessionScreenState extends State<SessionScreen> {
                 onPressed: () => Navigator.pop(context),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  double _wheelSize(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return (size.width * 0.92).clamp(240.0, 420.0);
+  }
+
+  AppBar _buildAppBar(String title) {
+    return AppBar(
+      backgroundColor: kSurface,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.close, color: kText2, size: 20),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Text(title,
+          style: GoogleFonts.syne(
+              fontSize: 16, fontWeight: FontWeight.w700, color: kText)),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: kBorder),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(int current, int total) {
+    final progress = total == 0 ? 0.0 : current / total;
+    return Container(
+      height: 3,
+      color: kSurface2,
+      child: FractionallySizedBox(
+        widthFactor: progress,
+        alignment: Alignment.centerLeft,
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(colors: [kAccent, kAccent3]),
           ),
         ),
       ),
@@ -603,10 +493,7 @@ class _SkippedWheelTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: kSurface2.withAlpha(128),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: kText3.withAlpha(51),
-          style: BorderStyle.solid,
-        ),
+        border: Border.all(color: kText3.withAlpha(51)),
       ),
       child: Row(
         children: [
@@ -622,10 +509,8 @@ class _SkippedWheelTile extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            'Ignorée',
-            style: GoogleFonts.dmSans(fontSize: 10, color: kText3),
-          ),
+          Text('Ignorée',
+              style: GoogleFonts.dmSans(fontSize: 10, color: kText3)),
         ],
       ),
     );
@@ -654,7 +539,6 @@ class _SummaryCard extends StatelessWidget {
     final hasResult = results.isNotEmpty;
     final isMulti = results.length > 1;
 
-    // Couleur de la première option gagnante (ou fallback)
     final winnerOpt = hasResult
         ? wheel.options.firstWhere(
             (o) => o.name == results.first,
@@ -680,7 +564,6 @@ class _SummaryCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Index badge
           Container(
             width: 32,
             height: 32,
@@ -718,7 +601,8 @@ class _SummaryCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(wheel.name,
-                        style: GoogleFonts.dmSans(fontSize: 12, color: kText3)),
+                        style:
+                            GoogleFonts.dmSans(fontSize: 12, color: kText3)),
                     if (skipped) ...[
                       const Gap(6),
                       SgChip('Ignorée', color: kText3),
@@ -733,13 +617,16 @@ class _SummaryCard extends StatelessWidget {
                 if (skipped)
                   Text('(conditions non remplies)',
                       style: GoogleFonts.syne(
-                          fontSize: 13, fontWeight: FontWeight.w600, color: kText3))
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kText3))
                 else if (!hasResult)
                   Text('(non joué)',
                       style: GoogleFonts.syne(
-                          fontSize: 14, fontWeight: FontWeight.w700, color: kText3))
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: kText3))
                 else if (isMulti)
-                  // Afficher chaque résultat sous forme de chips
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
@@ -772,7 +659,9 @@ class _SummaryCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: color.withAlpha(128), blurRadius: 6)],
+                boxShadow: [
+                  BoxShadow(color: color.withAlpha(128), blurRadius: 6)
+                ],
               ),
             ),
         ],

@@ -5,13 +5,13 @@ import '../../data/models/spin_wheel.dart';
 final class SessionStep {
   final SpinWheel wheel;
 
-  /// Numéro du tour (1-based) pour les roues répétées.
+  /// Numéro du tour (1-based) pour les roues répétées (ex. "Tour 2/3").
   final int spinNumber;
   final int totalSpins;
-  String? result;
-  bool skipped;
+  final String? result;
+  final bool skipped;
 
-  SessionStep({
+  const SessionStep({
     required this.wheel,
     this.spinNumber = 1,
     this.totalSpins = 1,
@@ -27,13 +27,14 @@ final class SessionStep {
     int? spinNumber,
     int? totalSpins,
     String? result,
+    bool clearResult = false,
     bool? skipped,
   }) =>
       SessionStep(
         wheel: wheel ?? this.wheel,
         spinNumber: spinNumber ?? this.spinNumber,
         totalSpins: totalSpins ?? this.totalSpins,
-        result: result ?? this.result,
+        result: clearResult ? null : result ?? this.result,
         skipped: skipped ?? this.skipped,
       );
 }

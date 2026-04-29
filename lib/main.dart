@@ -1,10 +1,11 @@
 // lib/main.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'providers/groups_provider.dart';
-import 'screens/home_screen.dart';
-import 'utils/app_theme.dart';
+import 'presentation/providers/groups_provider.dart';
+import 'presentation/screens/home/home_screen.dart';
+import 'presentation/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -1,13 +1,14 @@
-// lib/widgets/wheel_painter.dart
+// lib/presentation/screens/widgets/wheel_painter.dart
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../models/models.dart';
+import '../../../data/models/models.dart';
+import '../../../domain/session/session_engine.dart';
 
 class WheelPainter extends CustomPainter {
   final SpinWheel wheel;
   final List<SpinWheel> allWheels;
-  final double rotationAngle; // radians
+  final double rotationAngle;
 
   WheelPainter({
     required this.wheel,
@@ -21,20 +22,21 @@ class WheelPainter extends CustomPainter {
     final cy = size.height / 2;
     final radius = math.min(cx, cy) - 4;
 
-    final effectiveWeights = wheel.effectiveWeights(allWheels);
-    final activeOpts = wheel.options.where((o) => (effectiveWeights[o.id] ?? 0) > 0).toList();
+    final effectiveWeights = SessionEngine.effectiveWeights(wheel, allWheels);
+    final activeOpts =
+        wheel.options.where((o) => (effectiveWeights[o.id] ?? 0) > 0).toList();
 
     if (activeOpts.isEmpty) {
       _drawEmpty(canvas, cx, cy, radius);
       return;
     }
 
-    // Calcul des couleurs (dégradé ou couleurs individuelles)
-    final gradientColors = wheel.gradientColors();
+    final gradientColors = SessionEngine.gradientColors(wheel);
     Color optColor(WheelOption opt) =>
         gradientColors.isNotEmpty ? (gradientColors[opt.id] ?? opt.color) : opt.color;
 
-    final total = activeOpts.fold(0.0, (s, o) => s + (effectiveWeights[o.id] ?? 0));
+    final total =
+        activeOpts.fold(0.0, (s, o) => s + (effectiveWeights[o.id] ?? 0));
     double startAngle = rotationAngle - math.pi / 2;
 
     for (final opt in activeOpts) {
@@ -42,7 +44,6 @@ class WheelPainter extends CustomPainter {
       final sweep = (w / total) * math.pi * 2;
       final color = optColor(opt);
 
-      // Segment coloré
       final fillPaint = Paint()
         ..color = color
         ..style = PaintingStyle.fill;
@@ -54,7 +55,6 @@ class WheelPainter extends CustomPainter {
         fillPaint,
       );
 
-      // Bordure
       final strokePaint = Paint()
         ..color = Colors.black.withAlpha(76)
         ..style = PaintingStyle.stroke
@@ -67,9 +67,7 @@ class WheelPainter extends CustomPainter {
         strokePaint,
       );
 
-      // Label – adaptatif : taille de police et longueur selon arc disponible
       final midAngle = startAngle + sweep / 2;
-      // Position sur 62% du rayon (zone lisible entre centre et bord)
       final labelRadius = radius * 0.62;
       final lx = cx + labelRadius * math.cos(midAngle);
       final ly = cy + labelRadius * math.sin(midAngle);
@@ -78,27 +76,18 @@ class WheelPainter extends CustomPainter {
       canvas.translate(lx, ly);
       canvas.rotate(midAngle + math.pi / 2);
 
-      // Longueur de l'arc disponible à mi-rayon (zone de texte)
       final arcLength = sweep * labelRadius;
-      // Hauteur disponible dans le segment (le long du rayon)
       final segHeight = radius * 0.55;
-
-      // Taille de police : s'adapte à l'arc disponible
-      // On vise ~6px par caractère de largeur → on calcule combien tient dans arcLength
       double fontSize = (arcLength / 7.0).clamp(7.0, 15.0);
 
-      // Contraste adaptatif
       final luminance = color.computeLuminance();
       final textColor = luminance > 0.4
           ? Colors.black.withAlpha(204)
           : Colors.white.withAlpha(230);
 
-      // Combien de caractères tiennent sur une ligne à cette taille ?
       final charsPerLine = (arcLength / (fontSize * 0.62)).floor().clamp(3, 40);
-      // Combien de lignes tiennent en hauteur ?
       final maxLines = (segHeight / (fontSize * 1.3)).floor().clamp(1, 4);
 
-      // Découper le label en lignes en respectant les mots
       final words = opt.name.split(' ');
       final lines = <String>[];
       var current = '';
@@ -108,7 +97,6 @@ class WheelPainter extends CustomPainter {
           current = test;
         } else {
           if (current.isNotEmpty) lines.add(current);
-          // Si le mot seul est trop long, on le tronque
           current = word.length > charsPerLine
               ? '${word.substring(0, charsPerLine - 1)}…'
               : word;
@@ -116,10 +104,13 @@ class WheelPainter extends CustomPainter {
         if (lines.length >= maxLines) break;
       }
       if (current.isNotEmpty && lines.length < maxLines) lines.add(current);
-      // Si on a débordé, tronquer la dernière ligne
-      if (lines.isNotEmpty && lines.length == maxLines && current != lines.last) {
+      if (lines.isNotEmpty &&
+          lines.length == maxLines &&
+          current != lines.last) {
         final last = lines.last;
-        if (last.length > 2) lines[lines.length - 1] = '${last.substring(0, last.length - 1)}…';
+        if (last.length > 2) {
+          lines[lines.length - 1] = '${last.substring(0, last.length - 1)}…';
+        }
       }
       final labelText = lines.join('\n');
 
@@ -145,7 +136,6 @@ class WheelPainter extends CustomPainter {
       startAngle += sweep;
     }
 
-    // Cercle central
     final centerPaint = Paint()
       ..color = const Color(0xFF0D0E14)
       ..style = PaintingStyle.fill;
@@ -187,22 +177,19 @@ class WheelPainter extends CustomPainter {
       oldDelegate.wheel != wheel;
 }
 
-// ──────────────────────────────────────────────
-// Widget complet: roue + pointeur + animation
-// ──────────────────────────────────────────────
-
 class SpinWheelWidget extends StatefulWidget {
   final SpinWheel wheel;
   final List<SpinWheel> allWheels;
   final double size;
-  final void Function(WheelOption winner)? onResult;
+
+  final void Function(double finalAngle)? onSpinEnd;
 
   const SpinWheelWidget({
     super.key,
     required this.wheel,
     required this.allWheels,
     this.size = 320,
-    this.onResult,
+    this.onSpinEnd,
   });
 
   @override
@@ -226,7 +213,7 @@ class SpinWheelWidgetState extends State<SpinWheelWidget>
     _ctrl.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _spinning = false;
-        _announceResult();
+        widget.onSpinEnd?.call(_currentAngle);
       }
     });
   }
@@ -241,47 +228,19 @@ class SpinWheelWidgetState extends State<SpinWheelWidget>
 
   void spin() {
     if (_spinning) return;
-    final opts = widget.wheel.options;
-    if (opts.isEmpty) return;
+    if (widget.wheel.options.isEmpty) return;
 
     _spinning = true;
     final extra = math.pi * 2 * (6 + math.Random().nextDouble() * 4);
     final target = _currentAngle + extra;
-
-    final duration = Duration(milliseconds: (3000 + math.Random().nextInt(1500)).toInt());
+    final duration =
+        Duration(milliseconds: (3000 + math.Random().nextInt(1500)).toInt());
 
     _anim = Tween<double>(begin: _currentAngle, end: target).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
     );
     _ctrl.duration = duration;
     _ctrl.forward(from: 0);
-  }
-
-  void _announceResult() {
-    final effectiveWeights = widget.wheel.effectiveWeights(widget.allWheels);
-    final activeOpts = widget.wheel.options
-        .where((o) => (effectiveWeights[o.id] ?? 0) > 0)
-        .toList();
-    if (activeOpts.isEmpty) return;
-
-    final total = activeOpts.fold(0.0, (s, o) => s + (effectiveWeights[o.id] ?? 0));
-    // Angle normalisé dans [0, 2π]
-    final finalAngle = _currentAngle % (math.pi * 2);
-    // Le pointeur est en haut (−π/2). On cherche l'option sous le pointeur.
-    final pointer = ((math.pi * 2) - finalAngle) % (math.pi * 2);
-
-    double cum = 0;
-    WheelOption? winner;
-    for (final opt in activeOpts) {
-      final w = effectiveWeights[opt.id] ?? 0;
-      cum += (w / total) * math.pi * 2;
-      if (pointer < cum) {
-        winner = opt;
-        break;
-      }
-    }
-    winner ??= activeOpts.last;
-    widget.onResult?.call(winner);
   }
 
   @override
@@ -292,12 +251,10 @@ class SpinWheelWidgetState extends State<SpinWheelWidget>
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
-          // Pointeur
           Positioned(
             top: 0,
             child: _PointerArrow(),
           ),
-          // Roue
           Padding(
             padding: const EdgeInsets.only(top: 16),
             child: CustomPaint(

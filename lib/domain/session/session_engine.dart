@@ -1,11 +1,14 @@
 // lib/domain/session/session_engine.dart
 
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import '../../core/utils/color_utils.dart';
 import '../../core/utils/condition_parser.dart';
 import '../../data/models/models.dart';
 import 'session_step.dart';
 
 abstract final class SessionEngine {
+
   static Map<String, double> effectiveWeights(
     SpinWheel wheel,
     List<SpinWheel> allWheels,
@@ -34,6 +37,11 @@ abstract final class SessionEngine {
       }
     }
     return weights;
+  }
+
+  static Map<String, Color> gradientColors(SpinWheel wheel) {
+    if (wheel.gradientBaseColor == null) return {};
+    return ColorUtils.buildGradientMap(wheel.options, wheel.gradientBaseColor!);
   }
 
   static bool isSkipped(SpinWheel wheel, List<SpinWheel> allWheels) {
@@ -102,8 +110,10 @@ abstract final class SessionEngine {
         oldIdx++;
       }
       if (oldIdx < previousSteps.length) {
-        rebuilt[i].result = previousSteps[oldIdx].result;
-        rebuilt[i].skipped = previousSteps[oldIdx].skipped;
+        rebuilt[i] = rebuilt[i].copyWith(
+          result: previousSteps[oldIdx].result,
+          skipped: previousSteps[oldIdx].skipped,
+        );
         oldIdx++;
       }
     }
@@ -131,7 +141,6 @@ abstract final class SessionEngine {
     }
     return activeOpts.last;
   }
-
 
   static SpinWheel? _findWheel(List<SpinWheel> wheels, String id) {
     try {
