@@ -13,8 +13,8 @@ import '../../../domain/session/session_step.dart';
 import '../../providers/groups_provider.dart';
 import '../../providers/session_provider.dart';
 import '../../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
-import '../widgets/wheel_painter.dart';
+import '../../widgets/widgets.dart';
+import '../../widgets/wheel_painter.dart';
 
 // ──────────────────────────────────────────────
 // Point d'entrée : instancie le SessionProvider en scope local

@@ -15,11 +15,11 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
-import '../models/condition_parser.dart';
-import '../providers/groups_provider.dart';
-import '../utils/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import '../../../data/models/models.dart';
+import '../../../core/utils/condition_parser.dart';
+import '../../providers/groups_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/widgets.dart';
 
 // ──────────────────────────────────────────────
 // Widget principal

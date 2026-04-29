@@ -5,13 +5,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gap/gap.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
-import '../providers/groups_provider.dart';
-import '../utils/app_theme.dart';
-import '../utils/import_export.dart';
-import '../widgets/common_widgets.dart';
-import 'group_editor_screen.dart';
-import 'session_screen.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../data/models/models.dart';
+import '../../providers/groups_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/widgets.dart';
+import '../session/session_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
