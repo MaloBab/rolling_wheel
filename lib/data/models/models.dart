@@ -1,4 +1,4 @@
-// lib/models/models.dart
+// lib/data/models/models.dart
 export 'wheel_option.dart';
 export 'dependency.dart';
 export 'spin_wheel.dart';

@@ -1,19 +1,13 @@
-// lib/models/dependency.dart
+// lib/data/models/dependency.dart
 
-/// Représente une dépendance entre deux roues d'un même groupe.
+/// Dépendance de poids entre deux roues.
 ///
 /// Quand la roue [sourceWheelId] donne un résultat, les poids des options
 /// de la roue cible sont remplacés par la matrice [weights].
 ///
-/// Structure de [weights]:
-///   { sourceOptionId: { targetOptionId: double } }
-///
-/// Exemple: si la roue "Classe" tombe sur "Guerrier" (id: "abc"),
-/// alors dans la roue "Arme", "Épée" (id: "xyz") aura un poids de 5.0.
-class Dependency {
+/// Structure : weights[sourceOptionId][targetOptionId] = double
+final class Dependency {
   final String sourceWheelId;
-
-  /// weights[sourceOptionId][targetOptionId] = double
   final Map<String, Map<String, double>> weights;
 
   const Dependency({
@@ -24,12 +18,11 @@ class Dependency {
   Dependency copyWith({
     String? sourceWheelId,
     Map<String, Map<String, double>>? weights,
-  }) {
-    return Dependency(
-      sourceWheelId: sourceWheelId ?? this.sourceWheelId,
-      weights: weights ?? this.weights,
-    );
-  }
+  }) =>
+      Dependency(
+        sourceWheelId: sourceWheelId ?? this.sourceWheelId,
+        weights: weights ?? this.weights,
+      );
 
   Map<String, dynamic> toJson() => {
         'sourceWheelId': sourceWheelId,
