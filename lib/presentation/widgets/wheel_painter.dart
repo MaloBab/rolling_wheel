@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../data/models/models.dart';
 import '../../../domain/session/session_engine.dart';
+import '../extensions/model_extensions.dart';
 
 class WheelPainter extends CustomPainter {
   final SpinWheel wheel;
@@ -31,9 +32,10 @@ class WheelPainter extends CustomPainter {
       return;
     }
 
-    final gradientColors = SessionEngine.gradientColors(wheel);
-    Color optColor(WheelOption opt) =>
-        gradientColors.isNotEmpty ? (gradientColors[opt.id] ?? opt.color) : opt.color;
+    final gradientValues = SessionEngine.gradientColorValues(wheel);
+    Color optColor(WheelOption opt) => gradientValues.isNotEmpty
+        ? Color(gradientValues[opt.id] ?? opt.colorValue)
+        : opt.color;
 
     final total =
         activeOpts.fold(0.0, (s, o) => s + (effectiveWeights[o.id] ?? 0));

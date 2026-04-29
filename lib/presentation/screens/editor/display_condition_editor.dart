@@ -20,6 +20,7 @@ import '../../../core/utils/condition_parser.dart';
 import '../../providers/groups_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/widgets.dart';
+import '../../extensions/model_extensions.dart';
 
 // ──────────────────────────────────────────────
 // Widget principal

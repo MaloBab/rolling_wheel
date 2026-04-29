@@ -15,6 +15,7 @@ import '../../providers/session_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/wheel_painter.dart';
+import '../../extensions/model_extensions.dart';
 
 // ──────────────────────────────────────────────
 // Point d'entrée : instancie le SessionProvider en scope local
@@ -542,7 +543,7 @@ class _SummaryCard extends StatelessWidget {
     final winnerOpt = hasResult
         ? wheel.options.firstWhere(
             (o) => o.name == results.first,
-            orElse: () => WheelOption(id: '', name: '', color: kAccent),
+            orElse: () => WheelOption(id: '', name: '', colorValue: kAccent.toARGB32()),
           )
         : null;
     final color = skipped ? kText3 : (winnerOpt?.color ?? kText3);
@@ -633,9 +634,7 @@ class _SummaryCard extends StatelessWidget {
                     children: results.asMap().entries.map((e) {
                       final optColor = wheel.options
                           .firstWhere((o) => o.name == e.value,
-                              orElse: () =>
-                                  WheelOption(id: '', name: '', color: color))
-                          .color;
+                              orElse: () => WheelOption(id: '', name: '', colorValue: color.toARGB32())).color;
                       return _ResultChip(label: e.value, color: optColor);
                     }).toList(),
                   )

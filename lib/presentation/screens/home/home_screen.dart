@@ -11,6 +11,9 @@ import '../../providers/groups_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/widgets.dart';
 import '../session/session_screen.dart';
+import '../../../data/services/import_export_service.dart';
+import '../../../presentation/extensions/model_extensions.dart';
+import '../editor/group_editor_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -142,13 +145,16 @@ class HomeScreen extends StatelessWidget {
   }
 
   Future<void> _importGroup(BuildContext context) async {
-    final result = await importGroupFromFile();
+    final rawResult = await ImportExportService.importFromFile();
+    final success = rawResult is ImportSuccess;
+    final group = rawResult is ImportSuccess ? rawResult.group : null;
+    final error = rawResult is ImportFailure ? rawResult.message : null;
     if (!context.mounted) return;
-    if (result.success) {
-      context.read<GroupsProvider>().importGroup(result.group!);
-      showSgSnackbar(context, '✓ Groupe "${result.group!.name}" importé');
+    if (success) {
+      context.read<GroupsProvider>().importGroup(group!);
+      showSgSnackbar(context, '✓ Groupe "${group.name}" importé');
     } else {
-      showSgSnackbar(context, result.error ?? 'Erreur d\'import', error: true);
+      showSgSnackbar(context, error ?? 'Erreur d\'import', error: true);
     }
   }
 }
@@ -306,11 +312,11 @@ class _GroupActions extends StatelessWidget {
 
   Future<void> _exportGroup(BuildContext context) async {
     try {
-      await shareGroup(group);
+      await ImportExportService.shareGroup(group);
     } catch (e) {
       if (!context.mounted) return;
       // Fallback: afficher JSON dans dialog
-      final json = exportGroupAsString(group);
+      final json = ImportExportService.groupToJson(group);
       showDialog(
         context: context,
         builder: (_) => _JsonExportDialog(groupName: group.name, json: json),

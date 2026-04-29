@@ -34,7 +34,7 @@ abstract final class SessionEngine {
   static Map<String, int> gradientColorValues(SpinWheel wheel) {
     if (wheel.gradientBaseColorValue == null) return {};
     return ColorUtils.buildGradientMapFromInt(
-      wheel.options,
+      wheel.options.map((o) => (id: o.id)).toList(),
       wheel.gradientBaseColorValue!,
     );
   }

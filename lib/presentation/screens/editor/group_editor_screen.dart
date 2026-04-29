@@ -11,6 +11,8 @@ import '../../providers/groups_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/wheel_painter.dart';
+import '../../../presentation/extensions/model_extensions.dart';
+import '../../../core/constants/app_constants.dart';
 
 class GroupEditorScreen extends StatefulWidget {
   final String groupId;
